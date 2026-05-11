@@ -1,0 +1,939 @@
+/* ==========================================
+   CSS Custom Properties (Theme Variables)
+   ========================================== */
+
+:root {
+  /* Light theme (default) */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #f0f0f0;
+  --bg-sidebar: #f6f8fa;
+  --bg-toolbar: #fafbfc;
+  --bg-statusbar: #fafbfc;
+  --bg-code: #f6f8fa;
+  --bg-table-header: #f6f8fa;
+  --bg-table-stripe: #fafbfc;
+  --bg-blockquote: #f6f8fa;
+  --bg-dropdown: #ffffff;
+  --bg-dropdown-hover: #f0f0f0;
+  --bg-toolbar-btn-hover: #e8e8e8;
+  --bg-welcome: #f6f8fa;
+
+  --text-primary: #24292e;
+  --text-secondary: #586069;
+  --text-tertiary: #6a737d;
+  --text-link: #0366d6;
+  --text-heading: #24292e;
+  --text-code: #e36209;
+
+  --border-color: #e1e4e8;
+  --border-light: #eaecef;
+  --border-hr: #e1e4e8;
+
+  --code-keyword: #d73a49;
+  --code-string: #032f62;
+  --code-comment: #6a737d;
+  --code-function: #6f42c1;
+  --code-number: #005cc5;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 3px 6px rgba(0,0,0,0.1);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+
+  --scrollbar-bg: #f0f0f0;
+  --scrollbar-thumb: #c1c1c1;
+
+  --accent-color: #0366d6;
+  --accent-hover: #0256b9;
+  --danger-color: #cb2431;
+
+  --sidebar-width: 280px;
+  --toolbar-height: 44px;
+  --statusbar-height: 28px;
+}
+
+/* Dark theme */
+body.dark-theme {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d30;
+  --bg-sidebar: #252526;
+  --bg-toolbar: #323233;
+  --bg-statusbar: #323233;
+  --bg-code: #1e1e1e;
+  --bg-table-header: #2d2d30;
+  --bg-table-stripe: #252526;
+  --bg-blockquote: #2d2d30;
+  --bg-dropdown: #2d2d30;
+  --bg-dropdown-hover: #3e3e42;
+  --bg-toolbar-btn-hover: #3e3e42;
+  --bg-welcome: #252526;
+
+  --text-primary: #d4d4d4;
+  --text-secondary: #ababab;
+  --text-tertiary: #858585;
+  --text-link: #4daafc;
+  --text-heading: #e0e0e0;
+  --text-code: #ce9178;
+
+  --border-color: #3e3e42;
+  --border-light: #333333;
+  --border-hr: #444444;
+
+  --code-keyword: #569cd6;
+  --code-string: #ce9178;
+  --code-comment: #6a9955;
+  --code-function: #dcdcaa;
+  --code-number: #b5cea8;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 3px 6px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+
+  --scrollbar-bg: #1e1e1e;
+  --scrollbar-thumb: #424242;
+
+  --accent-color: #4daafc;
+  --accent-hover: #3d9aec;
+  --danger-color: #f44747;
+}
+
+/* ==========================================
+   Base Styles
+   ========================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  transition: background 0.3s, color 0.3s;
+}
+
+/* ==========================================
+   Scrollbar
+   ========================================== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* ==========================================
+   Toolbar
+   ========================================== */
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--toolbar-height);
+  padding: 0 12px;
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-app-region: drag;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  -webkit-app-region: no-drag;
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+  -webkit-app-region: no-drag;
+}
+
+.toolbar-btn:hover {
+  background: var(--bg-toolbar-btn-hover);
+  border-color: var(--border-color);
+}
+
+.toolbar-btn:active {
+  background: var(--bg-tertiary);
+}
+
+.toolbar-btn svg {
+  flex-shrink: 0;
+}
+
+.zoom-btn {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: bold;
+  padding: 5px 8px;
+  min-width: 28px;
+  justify-content: center;
+}
+
+.export-btn {
+  font-size: 12px;
+}
+
+.toolbar-sep {
+  color: var(--border-color);
+  margin: 0 6px;
+  font-size: 14px;
+  user-select: none;
+}
+
+.zoom-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  min-width: 34px;
+  text-align: center;
+  font-family: monospace;
+}
+
+/* Recent files dropdown */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 280px;
+  background: var(--bg-dropdown);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  margin-top: 4px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.dropdown.active .dropdown-content {
+  display: block;
+}
+
+.dropdown-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 0.1s;
+  white-space: nowrap;
+}
+
+.dropdown-item:hover {
+  background: var(--bg-dropdown-hover);
+}
+
+.dropdown-item .file-path {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-left: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-empty {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+/* ==========================================
+   Tab Bar
+   ========================================== */
+
+#tab-bar {
+  display: flex;
+  align-items: stretch;
+  height: 36px;
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-shrink: 0;
+  user-select: none;
+  scrollbar-width: thin;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+#tab-bar::-webkit-scrollbar {
+  height: 3px;
+}
+
+#tab-bar::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 2px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  min-width: 100px;
+  max-width: 200px;
+  height: 100%;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: transparent;
+  border-right: 1px solid var(--border-color);
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab:hover {
+  background: var(--bg-dropdown-hover);
+  color: var(--text-primary);
+}
+
+.tab.active {
+  background: var(--bg-primary);
+  color: var(--accent-color);
+  border-bottom: 2px solid var(--accent-color);
+  margin-bottom: -1px;
+  font-weight: 500;
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-tertiary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
+}
+
+.tab-close:hover {
+  background: var(--bg-toolbar-btn-hover);
+  color: var(--danger-color);
+}
+
+/* ==========================================
+   Main Layout
+   ========================================== */
+
+#main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: width 0.25s ease, background 0.3s, border-color 0.3s;
+  overflow: hidden;
+}
+
+.sidebar.collapsed {
+  width: 0;
+  border-right: none;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.sidebar-header h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.icon-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-toolbar-btn-hover);
+}
+
+/* TOC Navigation */
+.toc-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.toc-item {
+  display: block;
+  padding: 4px 16px 4px 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.15s;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toc-item:hover {
+  color: var(--text-primary);
+  background: var(--bg-dropdown-hover);
+}
+
+.toc-item.active {
+  color: var(--accent-color);
+  border-left-color: var(--accent-color);
+  background: var(--bg-dropdown-hover);
+}
+
+.toc-item.level-2 { padding-left: 32px; font-size: 12px; }
+.toc-item.level-3 { padding-left: 48px; font-size: 12px; }
+
+/* Content Area */
+#content-area {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* Floating expand sidebar button */
+.floating-btn {
+  position: fixed;
+  left: 8px;
+  top: calc(var(--toolbar-height) + 8px);
+  z-index: 500;
+  background: var(--bg-dropdown);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  padding: 6px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  box-shadow: var(--shadow-md);
+  transition: background 0.15s;
+}
+
+.floating-btn:hover {
+  background: var(--bg-toolbar-btn-hover);
+}
+
+/* ==========================================
+   Markdown Content Styles (GitHub-style)
+   ========================================== */
+
+.markdown-body {
+  padding: 32px 48px;
+  max-width: 900px;
+  margin: 0 auto;
+  color: var(--text-primary);
+  transition: color 0.3s;
+}
+
+.markdown-body .welcome-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.markdown-body .welcome-icon {
+  margin-bottom: 20px;
+  opacity: 0.5;
+}
+
+.markdown-body .welcome-screen h2 {
+  font-size: 24px;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.markdown-body .welcome-screen .welcome-shortcuts {
+  margin-top: 20px;
+}
+
+.markdown-body .welcome-screen kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-family: monospace;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  box-shadow: 0 1px 0 var(--border-color);
+  margin-right: 4px;
+}
+
+.markdown-body .welcome-drag {
+  margin-top: 16px;
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+/* Typography */
+.markdown-body h1 {
+  font-size: 2em;
+  font-weight: 600;
+  margin: 24px 0 16px;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-hr);
+  color: var(--text-heading);
+  line-height: 1.25;
+}
+
+.markdown-body h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin: 24px 0 16px;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-hr);
+  color: var(--text-heading);
+  line-height: 1.25;
+}
+
+.markdown-body h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 24px 0 16px;
+  color: var(--text-heading);
+  line-height: 1.25;
+}
+
+.markdown-body h4 {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 24px 0 16px;
+  color: var(--text-heading);
+}
+
+.markdown-body h5, .markdown-body h6 {
+  font-size: 0.875em;
+  font-weight: 600;
+  margin: 24px 0 16px;
+  color: var(--text-secondary);
+}
+
+.markdown-body p {
+  margin: 0 0 16px;
+}
+
+.markdown-body a {
+  color: var(--text-link);
+  text-decoration: none;
+}
+
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
+.markdown-body strong {
+  font-weight: 600;
+}
+
+.markdown-body del {
+  color: var(--text-tertiary);
+}
+
+/* Lists */
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 2em;
+  margin: 0 0 16px;
+}
+
+.markdown-body li {
+  margin: 4px 0;
+}
+
+.markdown-body li > ul,
+.markdown-body li > ol {
+  margin-bottom: 0;
+}
+
+/* Task Lists */
+.markdown-body .task-list-item {
+  list-style-type: none;
+  margin-left: -1.5em;
+}
+
+.markdown-body .task-list-item input[type="checkbox"] {
+  margin-right: 0.5em;
+  vertical-align: middle;
+}
+
+/* Blockquotes */
+.markdown-body blockquote {
+  padding: 0 1em;
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  border-left: 0.25em solid var(--border-color);
+  background: var(--bg-blockquote);
+  border-radius: 0 4px 4px 0;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.markdown-body blockquote > :first-child {
+  margin-top: 0;
+}
+
+.markdown-body blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* Code */
+.markdown-body code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background-color: var(--bg-code);
+  border-radius: 3px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  color: var(--text-code);
+  transition: background 0.3s;
+}
+
+.markdown-body pre {
+  margin: 0 0 16px;
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: var(--bg-code);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.markdown-body pre code {
+  padding: 0;
+  background: none;
+  font-size: 100%;
+  color: inherit;
+}
+
+/* HLJS theme adaptation for light/dark */
+.markdown-body pre code.hljs {
+  color: var(--text-primary);
+}
+
+body:not(.dark-theme) .markdown-body pre code .hljs-keyword,
+body:not(.dark-theme) .markdown-body pre code .hljs-selector-tag,
+body:not(.dark-theme) .markdown-body pre code .hljs-type {
+  color: #d73a49;
+}
+body:not(.dark-theme) .markdown-body pre code .hljs-string,
+body:not(.dark-theme) .markdown-body pre code .hljs-regexp {
+  color: #032f62;
+}
+body:not(.dark-theme) .markdown-body pre code .hljs-comment,
+body:not(.dark-theme) .markdown-body pre code .hljs-quote {
+  color: #6a737d;
+}
+body:not(.dark-theme) .markdown-body pre code .hljs-number,
+body:not(.dark-theme) .markdown-body pre code .hljs-literal {
+  color: #005cc5;
+}
+body:not(.dark-theme) .markdown-body pre code .hljs-function,
+body:not(.dark-theme) .markdown-body pre code .hljs-title {
+  color: #6f42c1;
+}
+body:not(.dark-theme) .markdown-body pre code .hljs-built_in,
+body:not(.dark-theme) .markdown-body pre code .hljs-title.class_ {
+  color: #6f42c1;
+}
+body:not(.dark-theme) .markdown-body pre code .hljs-attr,
+body:not(.dark-theme) .markdown-body pre code .hljs-attribute {
+  color: #6f42c1;
+}
+
+body.dark-theme .markdown-body pre code .hljs-keyword {
+  color: #569cd6;
+}
+body.dark-theme .markdown-body pre code .hljs-string {
+  color: #ce9178;
+}
+body.dark-theme .markdown-body pre code .hljs-comment {
+  color: #6a9955;
+}
+body.dark-theme .markdown-body pre code .hljs-function {
+  color: #dcdcaa;
+}
+body.dark-theme .markdown-body pre code .hljs-number {
+  color: #b5cea8;
+}
+
+/* Horizontal Rule */
+.markdown-body hr {
+  height: 0.25em;
+  padding: 0;
+  margin: 24px 0;
+  background-color: var(--border-hr);
+  border: 0;
+}
+
+/* Tables */
+.markdown-body table {
+  display: block;
+  width: 100%;
+  overflow: auto;
+  margin: 0 0 16px;
+  border-spacing: 0;
+  border-collapse: collapse;
+}
+
+.markdown-body table th {
+  font-weight: 600;
+  padding: 6px 13px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-table-header);
+  transition: background 0.3s;
+}
+
+.markdown-body table td {
+  padding: 6px 13px;
+  border: 1px solid var(--border-color);
+  transition: border-color 0.3s;
+}
+
+.markdown-body table tr {
+  background-color: var(--bg-primary);
+  transition: background 0.3s;
+}
+
+.markdown-body table tr:nth-child(2n) {
+  background-color: var(--bg-table-stripe);
+}
+
+/* Images — 50% width, centered */
+.markdown-body img {
+  display: block;
+  width: 50%;
+  height: auto;
+  margin: 16px auto 8px auto;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+/* Caption (text right after image in same/next paragraph) centered */
+.markdown-body p:has(img),
+.markdown-body p:has(img) + p {
+  text-align: center;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+}
+
+/* KaTeX */
+.markdown-body .katex-display {
+  margin: 1em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.markdown-body .katex {
+  font-size: 1.1em;
+}
+
+/* Mermaid */
+.markdown-body .mermaid {
+  margin: 16px 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.markdown-body .mermaid svg {
+  max-width: 100%;
+}
+
+/* ==========================================
+   Status Bar
+   ========================================== */
+
+#statusbar {
+  display: flex;
+  align-items: center;
+  height: var(--statusbar-height);
+  padding: 0 12px;
+  background: var(--bg-statusbar);
+  border-top: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  user-select: none;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.status-sep {
+  margin: 0 8px;
+  opacity: 0.4;
+}
+
+#status-filename {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================
+   Print Styles (for PDF Export)
+   ========================================== */
+
+@media print {
+  #toolbar,
+  #sidebar,
+  #statusbar,
+  .floating-btn,
+  #btn-expand-sidebar {
+    display: none !important;
+  }
+
+  body {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  #main-layout {
+    overflow: visible !important;
+  }
+
+  #content-area {
+    overflow: visible !important;
+  }
+
+  .markdown-body {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  .markdown-body {
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
+
+  /* Images MUST be visible in PDF */
+  .markdown-body img {
+    display: block !important;
+    width: 50% !important;
+    height: auto !important;
+    margin: 16px auto 8px auto !important;
+    page-break-inside: avoid;
+  }
+
+  /* Caption text centered in print */
+  .markdown-body p:has(img),
+  .markdown-body p:has(img) + p {
+    text-align: center !important;
+  }
+
+  /* Mermaid SVG in print */
+  .markdown-body .mermaid svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+}
+
+/* ==========================================
+   Responsive
+   ========================================== */
+
+@media (max-width: 900px) {
+  .btn-label {
+    display: none;
+  }
+
+  .markdown-body {
+    padding: 24px 20px;
+  }
+}
+
+/* ==========================================
+   Utility Animations
+   ========================================== */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.markdown-body > * {
+  animation: fadeIn 0.15s ease-out;
+}

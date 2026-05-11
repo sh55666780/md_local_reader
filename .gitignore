@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Reference projects (not part of this app)
+MinerU-master/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Electron builder
+*.blockmap
+
+# Large binaries
+*.exe
+*.7z
+*.dll
+*.pak
+*.bin
+*.dat
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test files
+test-*.js
+test-*.md
+
+# Temp
+/tmp/
+*.bak
+task.txt

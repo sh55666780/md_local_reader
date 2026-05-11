@@ -1,0 +1,44 @@
+{
+  "name": "md-local-reader",
+  "version": "1.0.0",
+  "description": "A local Markdown reader for Windows with HTML/PDF/Word export",
+  "main": "main.js",
+  "author": "Markdown Reader Team",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "highlight.js": "^11.9.0",
+    "html-docx-js": "^0.3.1",
+    "katex": "^0.16.9",
+    "marked": "^12.0.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.localreader.mdreader",
+    "productName": "Markdown Reader",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**"
+    ],
+    "asar": true,
+    "compression": "maximum",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
