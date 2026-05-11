@@ -1,3 +1,5 @@
+本软件研发的目的是为了读取md文档，支持类似MinerU OCR提取的有图片插入的md文档。
+
 # Markdown Reader
 
 A local Markdown reader for Windows, built with Electron.
