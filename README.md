@@ -15,12 +15,12 @@ A local Markdown reader for Windows, built with Electron.
 
 ## Install
 
-Download the latest `Markdown Reader Setup x.x.x.exe` from [Releases](https://github.com/bigzenor/md-local-reader/releases).
+Download the latest `Markdown Reader Setup x.x.x.exe` from [Releases](https://github.com/sh55666780/md_local_reader/releases).
 
 ## Development
 
 ```bash
-git clone https://github.com/bigzenor/md-local-reader.git
+git clone https://github.com/sh55666780/md_local_reader.git
 cd md-local-reader
 npm install
 npm start
