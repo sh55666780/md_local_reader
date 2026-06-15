@@ -75,6 +75,7 @@ function resolveImgPath(href, basePath) {
     const base64 = data.toString('base64');
     return `data:${mime};base64,${base64}`;
   } catch (e) {
+    console.warn('[img] Not found:', absolutePath, '(' + e.message + ')');
     return href; // fallback to original path if file not found
   }
 }
