@@ -286,7 +286,7 @@ function buildMenu() {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'About Markdown Reader',
-              message: 'Markdown Reader v1.0.0',
+              message: 'Markdown Reader v1.1.0',
               detail: 'A local Markdown reader with HTML/PDF/Word export.\nBuilt with Electron.\n\nDeveloper: bigzenor\nEmail: bigzenor@qq.com'
             });
           }
