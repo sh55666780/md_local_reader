@@ -1,19 +1,28 @@
 /**
- * App - Main controller for Markdown Reader (multi-tab support)
+ * App - Main controller for Markdown Reader (multi-tab + edit mode)
  */
 class App {
   constructor() {
     this.renderer = new MDToHTMLRenderer('');
     this.exporter = new Exporter(this);
-    this.tabs = [];           // { id, filePath, fileName, fileDir, markdown, html }
+    this.tabs = [];
     this.activeTabId = null;
     this.zoomLevel = 100;
     this.isDarkTheme = false;
+    this.isEditMode = false;
 
+    // DOM refs
     this.contentEl = document.getElementById('content');
+    this.splitView = document.getElementById('split-view');
+    this.editorTextarea = document.getElementById('md-editor');
+    this.previewContent = document.getElementById('preview-content');
+    this.editToolbar = document.getElementById('edit-toolbar');
     this.tocNav = document.getElementById('toc-nav');
     this.welcomeEl = document.getElementById('welcome');
     this.tabBar = document.getElementById('tab-bar');
+
+    // Editor instance (created on first edit mode)
+    this.editor = null;
   }
 
   get activeTab() {
@@ -31,10 +40,11 @@ class App {
 
   // ================ Init ================
   init() {
-    console.log('[App] Init tabs...');
+    console.log('[App] Init...');
     this._loadPreferences();
     this._applyTheme();
     this._initMermaid();
+    this._initEditor();
     this._bindEvents();
     this._bindIPC();
     this._setupDragDrop();
@@ -49,6 +59,48 @@ class App {
     try {
       window.mermaid.initialize({ startOnLoad: false, theme: this.isDarkTheme ? 'dark' : 'default', securityLevel: 'loose' });
     } catch (e) { console.warn('[App] Mermaid init:', e.message); }
+  }
+
+  _initEditor() {
+    this._setupSplitDivider();
+    this.editor = new MdEditor(this.splitView, this.editorTextarea, (content) => {
+      this._onEditorChanged(content);
+    });
+    this.editor.onSave = () => this._saveFile();
+  }
+
+  _setupSplitDivider() {
+    const divider = document.getElementById('split-divider');
+    const editorPane = document.getElementById('editor-pane');
+    const previewPane = document.getElementById('preview-pane');
+    let dragging = false;
+
+    divider.addEventListener('mousedown', (e) => {
+      dragging = true;
+      divider.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const splitView = document.getElementById('split-view');
+      const rect = splitView.getBoundingClientRect();
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      if (pct > 20 && pct < 80) {
+        editorPane.style.flex = pct;
+        previewPane.style.flex = 100 - pct;
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (dragging) {
+        dragging = false;
+        divider.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
   }
 
   _bindIPC() {
@@ -89,7 +141,6 @@ class App {
 
   // ================ Tabs ================
   _openFile(filePath, content) {
-    // Check if already open
     const existing = this.tabs.find(t => t.filePath === filePath);
     if (existing) {
       this._switchTab(existing.id);
@@ -114,11 +165,8 @@ class App {
 
     const tab = {
       id: 'tab_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-      filePath,
-      fileName: this._basename(filePath),
-      fileDir,
-      markdown: content,
-      html
+      filePath, fileName: this._basename(filePath), fileDir,
+      markdown: content, html
     };
 
     this.tabs.push(tab);
@@ -130,9 +178,7 @@ class App {
     this.activeTabId = tabId;
     const tab = this.activeTab;
     this._renderTabBar();
-    if (tab) {
-      this._showContent(tab);
-    }
+    if (tab) this._showContent(tab);
     this.updateStatusBar();
     updateTitle(tab);
     this._saveLastTab();
@@ -143,7 +189,6 @@ class App {
     const idx = this.tabs.findIndex(t => t.id === tabId);
     if (idx < 0) return;
     this.tabs.splice(idx, 1);
-
     if (this.tabs.length === 0) {
       this.activeTabId = null;
       this._renderTabBar();
@@ -152,8 +197,6 @@ class App {
       this.updateStatusBar();
       return;
     }
-
-    // Switch to adjacent tab
     const newIdx = Math.min(idx, this.tabs.length - 1);
     this._switchTab(this.tabs[newIdx].id);
   }
@@ -169,29 +212,104 @@ class App {
       el.addEventListener('click', () => this._switchTab(tab.id));
       this.tabBar.appendChild(el);
     });
-
-    // Close button handlers
     this.tabBar.querySelectorAll('.tab-close').forEach(btn => {
       btn.addEventListener('click', (e) => this._closeTab(btn.dataset.close, e));
     });
-
-    // Scroll active tab into view
     const activeEl = this.tabBar.querySelector('.tab.active');
     if (activeEl) activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-
     this._updateEmptyState();
   }
 
   _showContent(tab) {
+    if (this.isEditMode) {
+      this._enterEditMode(tab);
+    } else {
+      this._exitEditMode();
+      this.contentEl.innerHTML = tab.html;
+    }
     if (this.welcomeEl) this.welcomeEl.style.display = 'none';
-    this.contentEl.innerHTML = tab.html;
     this.generateTOC();
     this._runMermaid();
     this._saveLastTab();
   }
 
+  // ================ Edit Mode ================
+
+  toggleEditMode() {
+    const tab = this.activeTab;
+    if (!tab) { alert('Please open a file first.'); return; }
+
+    this.isEditMode = !this.isEditMode;
+
+    if (this.isEditMode) {
+      this._enterEditMode(tab);
+    } else {
+      this._exitEditMode();
+    }
+  }
+
+  _enterEditMode(tab) {
+    this.splitView.style.display = 'flex';
+    this.contentEl.style.display = 'none';
+    this.editToolbar.style.display = 'flex';
+    this.editor.setContent(tab.markdown);
+    // Render preview from current markdown
+    this._updatePreview(tab);
+  }
+
+  _exitEditMode() {
+    this.splitView.style.display = 'none';
+    this.contentEl.style.display = '';
+    this.editToolbar.style.display = 'none';
+    // Update the content area with latest rendered html
+    const tab = this.activeTab;
+    if (tab) this.contentEl.innerHTML = tab.html;
+  }
+
+  _onEditorChanged(content) {
+    const tab = this.activeTab;
+    if (!tab) return;
+    tab.markdown = content;
+    // Re-render preview
+    this._updatePreview(tab);
+    // Update status
+    this.updateStatusBar();
+  }
+
+  async _updatePreview(tab) {
+    this.renderer.setBasePath(tab.fileDir);
+    const html = await this.renderer.render(tab.markdown);
+    tab.html = html;
+    this.previewContent.innerHTML = html;
+    // Run mermaid in preview
+    this._runMermaidIn(this.previewContent);
+    // Rebuild TOC from preview headings
+    this._generateTOCFrom(this.previewContent);
+  }
+
+  // ================ Save File ================
+
+  async _saveFile() {
+    const tab = this.activeTab;
+    if (!tab) return;
+    try {
+      const content = this.editor.getContent();
+      const r = await window.electronAPI.saveFile(tab.filePath, content);
+      if (r && r.success) {
+        tab.markdown = content;
+        this.updateStatus('Saved: ' + tab.fileName);
+      }
+    } catch (e) {
+      console.error('[App] Save error:', e);
+      alert('Failed to save: ' + e.message);
+    }
+  }
+
+  // ================ Empty state ================
+
   _updateEmptyState() {
     if (this.tabs.length === 0) {
+      this._exitEditMode();
       if (this.welcomeEl) this.welcomeEl.style.display = '';
       this.contentEl.innerHTML = '';
       if (this.tocNav) this.tocNav.innerHTML = '';
@@ -211,6 +329,7 @@ class App {
   _bindEvents() {
     const b = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
     b('btn-open', 'click', () => this.openFileDialog());
+    b('btn-edit-mode', 'click', () => this.toggleEditMode());
     b('btn-theme', 'click', () => this.toggleTheme());
     b('btn-zoom-in', 'click', () => this.zoomIn());
     b('btn-zoom-out', 'click', () => this.zoomOut());
@@ -220,6 +339,13 @@ class App {
     b('btn-export-word', 'click', () => this.exporter.exportWord());
     b('btn-toggle-sidebar', 'click', () => this.toggleSidebar());
     b('btn-expand-sidebar', 'click', () => this.showSidebar());
+
+    // Edit toolbar buttons
+    b('btn-fmt-bold', 'click', () => this._runEditOp('bold'));
+    b('btn-fmt-underline', 'click', () => this._runEditOp('underline'));
+    b('btn-fmt-katex', 'click', () => this._runEditOp('formula'));
+    b('btn-fmt-braces', 'click', () => this._runEditOp('braces'));
+    b('btn-fmt-save', 'click', () => this._saveFile());
 
     const recBtn = document.getElementById('btn-recent');
     const recDrop = document.getElementById('recent-dropdown');
@@ -231,7 +357,6 @@ class App {
     const ca = document.getElementById('content-area');
     if (ca) {
       ca.addEventListener('wheel', e => { if (e.ctrlKey) { e.preventDefault(); e.deltaY < 0 ? this.zoomIn() : this.zoomOut(); } }, { passive: false });
-      ca.addEventListener('scroll', () => this._updateTocScrollSpy());
     }
 
     if (this.tocNav) {
@@ -249,7 +374,21 @@ class App {
     document.addEventListener('keydown', e => {
       if (e.ctrlKey && e.key === 'o') { e.preventDefault(); this.openFileDialog(); return; }
       if (e.ctrlKey && e.key === 'w') { e.preventDefault(); const t = this.activeTab; if (t) this._closeTab(t.id); return; }
+      if (e.ctrlKey && e.key === 'e') { e.preventDefault(); this.toggleEditMode(); return; }
+      if (e.ctrlKey && e.key === 'b' && this.isEditMode) { e.preventDefault(); this._runEditOp('bold'); return; }
+      if (e.ctrlKey && e.key === 's') { e.preventDefault(); if (this.isEditMode) this._saveFile(); return; }
     });
+  }
+
+  _runEditOp(op) {
+    if (!this.isEditMode) return;
+    if (!this.editor) return;
+    switch (op) {
+      case 'bold': this.editor.toggleBold(); break;
+      case 'underline': this.editor.toggleUnderline(); break;
+      case 'formula': this.editor.toggleInlineFormula(); break;
+      case 'braces': this.editor.toggleBraces(); break;
+    }
   }
 
   _setupDragDrop() {
@@ -276,18 +415,26 @@ class App {
 
   // ================ Mermaid ================
   async _runMermaid() {
-    if (typeof window.mermaid === 'undefined') return;
+    const target = this.isEditMode ? this.previewContent : this.contentEl;
+    await this._runMermaidIn(target);
+  }
+  async _runMermaidIn(container) {
+    if (typeof window.mermaid === 'undefined' || !container) return;
     try {
-      const els = this.contentEl.querySelectorAll('.mermaid');
+      const els = container.querySelectorAll('.mermaid');
       if (els.length > 0) await window.mermaid.run({ nodes: Array.from(els), suppressErrors: true });
     } catch (e) { console.warn('[App] Mermaid:', e.message); }
   }
 
   // ================ TOC ================
   generateTOC() {
-    if (!this.tocNav) return;
+    const target = this.isEditMode ? this.previewContent : this.contentEl;
+    this._generateTOCFrom(target);
+  }
+  _generateTOCFrom(container) {
+    if (!this.tocNav || !container) return;
     this.tocNav.innerHTML = '';
-    const headings = this.contentEl.querySelectorAll('h1, h2, h3');
+    const headings = container.querySelectorAll('h1, h2, h3');
     if (!headings.length) {
       this.tocNav.innerHTML = '<div style="padding:12px 16px;font-size:12px;color:var(--text-tertiary);text-align:center;">No headings</div>';
       return;
@@ -305,11 +452,11 @@ class App {
   }
 
   _updateTocScrollSpy() {
-    const ca = document.getElementById('content-area');
-    const hs = this.contentEl.querySelectorAll('h1, h2, h3');
+    const container = this.isEditMode ? this.previewContent : this.contentEl;
+    const hs = container.querySelectorAll('h1, h2, h3');
     const ti = this.tocNav.querySelectorAll('.toc-item');
     if (!hs.length || !ti.length) return;
-    const st = ca.scrollTop + 80;
+    const st = (this.isEditMode ? this.previewContent.scrollTop : document.getElementById('content-area').scrollTop) + 80;
     let ci = 0;
     for (let i = hs.length - 1; i >= 0; i--) { if (hs[i].offsetTop <= st) { ci = i; break; } }
     this._highlightTocItem(ti[ci]);
@@ -395,6 +542,7 @@ class App {
   _handleMenuAction(action) {
     switch (action) {
       case 'open-file': this.openFileDialog(); break;
+      case 'toggle-edit': this.toggleEditMode(); break;
       case 'export-html': this.exporter.exportHTML(); break;
       case 'export-pdf': this.exporter.exportPDF(); break;
       case 'export-word': this.exporter.exportWord(); break;
@@ -402,6 +550,11 @@ class App {
       case 'zoom-out': this.zoomOut(); break;
       case 'zoom-reset': this.resetZoom(); break;
       case 'toggle-theme': this.toggleTheme(); break;
+      case 'save-file': if (this.isEditMode) this._saveFile(); break;
+      case 'fmt-bold': this._runEditOp('bold'); break;
+      case 'fmt-underline': this._runEditOp('underline'); break;
+      case 'fmt-formula': this._runEditOp('formula'); break;
+      case 'fmt-braces': this._runEditOp('braces'); break;
     }
   }
 

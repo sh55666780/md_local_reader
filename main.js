@@ -202,6 +202,40 @@ function buildMenu() {
       ]
     },
     {
+      label: 'Edit',
+      submenu: [
+        {
+          label: 'Toggle Edit Mode',
+          accelerator: 'CmdOrCtrl+E',
+          click: () => mainWindow.webContents.send('menu-action', 'toggle-edit')
+        },
+        { type: 'separator' },
+        {
+          label: 'Bold',
+          accelerator: 'CmdOrCtrl+B',
+          click: () => mainWindow.webContents.send('menu-action', 'fmt-bold')
+        },
+        {
+          label: 'Underline',
+          click: () => mainWindow.webContents.send('menu-action', 'fmt-underline')
+        },
+        {
+          label: 'Inline Formula',
+          click: () => mainWindow.webContents.send('menu-action', 'fmt-formula')
+        },
+        {
+          label: 'Wrap Braces { }',
+          click: () => mainWindow.webContents.send('menu-action', 'fmt-braces')
+        },
+        { type: 'separator' },
+        {
+          label: 'Save',
+          accelerator: 'CmdOrCtrl+S',
+          click: () => mainWindow.webContents.send('menu-action', 'save-file')
+        }
+      ]
+    },
+    {
       label: 'Export',
       submenu: [
         {
