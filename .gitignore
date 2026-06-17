@@ -40,3 +40,7 @@ test-*.md
 /tmp/
 *.bak
 task.txt
+
+# Stray project files
+13662.txt
+ARCHITECTURE.md
