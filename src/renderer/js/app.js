@@ -305,6 +305,84 @@ class App {
     }
   }
 
+  // ================ Copy to Clipboard (WeChat 公众号 paste) ================
+
+  async copyToClipboard() {
+    const tab = this.activeTab;
+    if (!tab) { alert('Please open a file first.'); return; }
+
+    // Get rendered HTML from the active view
+    let container = this.isEditMode ? this.previewContent : this.contentEl;
+    const html = container.innerHTML;
+    if (!html || html.trim() === '') { alert('No content to copy.'); return; }
+
+    const plainText = container.textContent || '';
+
+    try {
+      // Modern Clipboard API with text/html support
+      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
+        const clipboardItem = new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([plainText], { type: 'text/plain' })
+        });
+        await navigator.clipboard.write([clipboardItem]);
+      } else {
+        // Fallback: execCommand approach
+        this._copyUsingExecCommand(html);
+      }
+      this._showCopiedFeedback();
+    } catch (e) {
+      // execCommand fallback for older browsers
+      try {
+        this._copyUsingExecCommand(html);
+        this._showCopiedFeedback();
+      } catch (e2) {
+        console.error('Copy failed:', e, e2);
+        alert('Copy failed. Please try again or use browser copy (Ctrl+C).');
+      }
+    }
+  }
+
+  _copyUsingExecCommand(html) {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    div.style.position = 'fixed';
+    div.style.left = '-9999px';
+    div.style.top = '0';
+    div.style.opacity = '0';
+    div.style.pointerEvents = 'none';
+    div.style.backgroundColor = '#ffffff';
+    div.style.color = '#000000';
+    document.body.appendChild(div);
+
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(div);
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    const success = document.execCommand('copy');
+    sel.removeAllRanges();
+    div.remove();
+
+    if (!success) throw new Error('execCommand copy failed');
+  }
+
+  _showCopiedFeedback() {
+    const btn = document.getElementById('btn-copy');
+    if (btn) {
+      btn.classList.add('copied');
+      const label = btn.querySelector('.btn-label');
+      const origText = label ? label.textContent : 'Copy';
+      if (label) label.textContent = 'Copied!';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        if (label) label.textContent = origText;
+      }, 2000);
+    }
+    this.updateStatus('Content copied to clipboard — paste in 微信公众号 editor');
+  }
+
   // ================ Empty state ================
 
   _updateEmptyState() {
@@ -337,6 +415,7 @@ class App {
     b('btn-export-html', 'click', () => this.exporter.exportHTML());
     b('btn-export-pdf', 'click', () => this.exporter.exportPDF());
     b('btn-export-word', 'click', () => this.exporter.exportWord());
+    b('btn-copy', 'click', () => this.copyToClipboard());
     b('btn-toggle-sidebar', 'click', () => this.toggleSidebar());
     b('btn-expand-sidebar', 'click', () => this.showSidebar());
 
@@ -375,6 +454,7 @@ class App {
       if (e.ctrlKey && e.key === 'o') { e.preventDefault(); this.openFileDialog(); return; }
       if (e.ctrlKey && e.key === 'w') { e.preventDefault(); const t = this.activeTab; if (t) this._closeTab(t.id); return; }
       if (e.ctrlKey && e.key === 'e') { e.preventDefault(); this.toggleEditMode(); return; }
+      if (e.ctrlKey && e.shiftKey && e.key === 'C') { e.preventDefault(); this.copyToClipboard(); return; }
       if (e.ctrlKey && e.key === 'b' && this.isEditMode) { e.preventDefault(); this._runEditOp('bold'); return; }
       if (e.ctrlKey && e.key === 's') { e.preventDefault(); if (this.isEditMode) this._saveFile(); return; }
     });
@@ -551,6 +631,7 @@ class App {
       case 'zoom-reset': this.resetZoom(); break;
       case 'toggle-theme': this.toggleTheme(); break;
       case 'save-file': if (this.isEditMode) this._saveFile(); break;
+      case 'copy-content': this.copyToClipboard(); break;
       case 'fmt-bold': this._runEditOp('bold'); break;
       case 'fmt-underline': this._runEditOp('underline'); break;
       case 'fmt-formula': this._runEditOp('formula'); break;

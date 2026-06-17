@@ -211,6 +211,24 @@ body {
   font-size: 12px;
 }
 
+/* Copy button - prominent accent color */
+.copy-btn {
+  font-size: 12px;
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.copy-btn:hover {
+  background: var(--accent-color);
+  color: #fff;
+}
+
+.copy-btn.copied {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+
 .toolbar-sep {
   color: var(--border-color);
   margin: 0 6px;

@@ -205,6 +205,12 @@ function buildMenu() {
       label: 'Edit',
       submenu: [
         {
+          label: 'Copy Rendered (for 公众号)',
+          accelerator: 'CmdOrCtrl+Shift+C',
+          click: () => mainWindow.webContents.send('menu-action', 'copy-content')
+        },
+        { type: 'separator' },
+        {
           label: 'Toggle Edit Mode',
           accelerator: 'CmdOrCtrl+E',
           click: () => mainWindow.webContents.send('menu-action', 'toggle-edit')
