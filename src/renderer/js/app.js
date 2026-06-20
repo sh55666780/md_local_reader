@@ -311,36 +311,173 @@ class App {
     const tab = this.activeTab;
     if (!tab) { alert('Please open a file first.'); return; }
 
-    // Get rendered HTML from the active view
     let container = this.isEditMode ? this.previewContent : this.contentEl;
-    const html = container.innerHTML;
-    if (!html || html.trim() === '') { alert('No content to copy.'); return; }
+    if (!container || !container.innerHTML.trim()) { alert('No content to copy.'); return; }
+
+    // Show processing
+    this.updateStatus('Processing for copy...');
+
+    // Wait a tick for any pending renders (mermaid, katex, etc.)
+    await new Promise(r => setTimeout(r, 100));
+
+    // Clone the container and inline all computed styles
+    const processed = this._prepareCopyContent(container);
 
     const plainText = container.textContent || '';
+    const success = await this._writeClipboard(processed, plainText);
+
+    if (success) {
+      this._showCopiedFeedback();
+      this.updateStatus('Copied! Paste into 微信公众号 editor.');
+    }
+  }
+
+  /**
+   * Clone visible DOM and inline all computed CSS styles.
+   * WeChat editor ignores stylesheets — only inline styles work.
+   */
+  _prepareCopyContent(source) {
+    // Clone in visible area so computed styles are accurate
+    const clone = source.cloneNode(true);
+    clone.style.position = 'fixed';
+    clone.style.top = '0';
+    clone.style.left = '-9999px';
+    clone.style.width = '800px';  // WeChat editor width
+    clone.style.backgroundColor = '#ffffff';
+    clone.style.color = '#000000';
+    clone.style.zIndex = '-1';
+    clone.style.pointerEvents = 'none';
+    document.body.appendChild(clone);
 
     try {
-      // Modern Clipboard API with text/html support
-      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
-        const clipboardItem = new ClipboardItem({
+      this._inlineStyles(clone, document);
+      return clone.innerHTML;
+    } finally {
+      clone.remove();
+    }
+  }
+
+  /**
+   * Walk all elements and compute + apply inline styles.
+   * Copies only the essential CSS properties for WeChat.
+   */
+  _inlineStyles(clone, realDoc) {
+    const INLINE_PROPS = [
+      'color', 'background-color', 'font-family', 'font-size', 'font-weight',
+      'font-style', 'text-align', 'text-decoration', 'line-height',
+      'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+      'padding', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
+      'border', 'border-top', 'border-bottom', 'border-left', 'border-right',
+      'border-collapse', 'vertical-align', 'white-space', 'word-break',
+      'display', 'width', 'max-width', 'height', 'overflow', 'overflow-x',
+    ];
+
+    const allEls = clone.querySelectorAll('*');
+    for (const el of allEls) {
+      try {
+        // Find corresponding element in real DOM by position/index
+        const idx = Array.from(clone.querySelectorAll('*')).indexOf(el);
+        const realEl = document.querySelectorAll('.markdown-body *')[idx];
+        if (realEl) {
+          const cs = getComputedStyle(realEl);
+          for (const prop of INLINE_PROPS) {
+            const val = cs.getPropertyValue(prop);
+            if (val && val !== 'normal' && val !== 'auto' && val !== 'rgba(0, 0, 0, 0)') {
+              el.style.setProperty(prop, val);
+            }
+          }
+        }
+      } catch (e) { /* skip */ }
+    }
+
+    // Special: KaTeX elements need font-family and sizing
+    const katexEls = clone.querySelectorAll('.katex, .katex *');
+    for (const el of katexEls) {
+      try {
+        const realKatex = document.querySelector('.katex');
+        if (realKatex) {
+          const cs = getComputedStyle(realKatex);
+          el.style.setProperty('font-family', cs.fontFamily);
+          el.style.setProperty('font-size', cs.fontSize);
+        }
+      } catch (e) { /* skip */ }
+    }
+
+    // Ensure images have proper sizing
+    const imgs = clone.querySelectorAll('img');
+    for (const img of imgs) {
+      img.style.setProperty('max-width', '100%');
+      img.style.setProperty('height', 'auto');
+    }
+
+    // Ensure code blocks have background
+    const pres = clone.querySelectorAll('pre');
+    for (const pre of pres) {
+      pre.style.setProperty('background-color', '#f6f8fa');
+      pre.style.setProperty('border', '1px solid #e1e4e8');
+      pre.style.setProperty('border-radius', '6px');
+      pre.style.setProperty('padding', '16px');
+      pre.style.setProperty('overflow-x', 'auto');
+    }
+    const codes = clone.querySelectorAll('pre code, code');
+    for (const code of codes) {
+      code.style.setProperty('font-family', 'Consolas, monospace');
+      code.style.setProperty('font-size', '14px');
+      if (!code.closest('pre')) {
+        code.style.setProperty('background-color', '#f6f8fa');
+        code.style.setProperty('padding', '2px 6px');
+        code.style.setProperty('border-radius', '3px');
+      }
+    }
+
+    // Blockquotes
+    const bqs = clone.querySelectorAll('blockquote');
+    for (const bq of bqs) {
+      bq.style.setProperty('border-left', '4px solid #dfe2e5');
+      bq.style.setProperty('padding-left', '16px');
+      bq.style.setProperty('color', '#6a737d');
+    }
+
+    // Tables
+    const tables = clone.querySelectorAll('table');
+    for (const t of tables) {
+      t.style.setProperty('border-collapse', 'collapse');
+      t.style.setProperty('width', '100%');
+    }
+    const cells = clone.querySelectorAll('th, td');
+    for (const c of cells) {
+      c.style.setProperty('border', '1px solid #dfe2e5');
+      c.style.setProperty('padding', '8px 12px');
+    }
+    const ths = clone.querySelectorAll('th');
+    for (const th of ths) {
+      th.style.setProperty('background-color', '#f6f8fa');
+      th.style.setProperty('font-weight', 'bold');
+    }
+
+    // Headings
+    for (const h of clone.querySelectorAll('h1, h2, h3, h4, h5, h6')) {
+      h.style.setProperty('font-weight', 'bold');
+      h.style.setProperty('margin', '16px 0 8px 0');
+    }
+
+    return clone;
+  }
+
+  async _writeClipboard(html, plainText) {
+    try {
+      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+        const item = new ClipboardItem({
           'text/html': new Blob([html], { type: 'text/html' }),
           'text/plain': new Blob([plainText], { type: 'text/plain' })
         });
-        await navigator.clipboard.write([clipboardItem]);
-      } else {
-        // Fallback: execCommand approach
-        this._copyUsingExecCommand(html);
+        await navigator.clipboard.write([item]);
+        return true;
       }
-      this._showCopiedFeedback();
     } catch (e) {
-      // execCommand fallback for older browsers
-      try {
-        this._copyUsingExecCommand(html);
-        this._showCopiedFeedback();
-      } catch (e2) {
-        console.error('Copy failed:', e, e2);
-        alert('Copy failed. Please try again or use browser copy (Ctrl+C).');
-      }
+      // Fall through to execCommand
     }
+    return this._copyUsingExecCommand(html);
   }
 
   _copyUsingExecCommand(html) {
@@ -366,6 +503,7 @@ class App {
     div.remove();
 
     if (!success) throw new Error('execCommand copy failed');
+    return true;
   }
 
   _showCopiedFeedback() {
