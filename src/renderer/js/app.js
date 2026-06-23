@@ -314,211 +314,135 @@ class App {
     let container = this.isEditMode ? this.previewContent : this.contentEl;
     if (!container || !container.innerHTML.trim()) { alert('No content to copy.'); return; }
 
-    // Show processing
-    this.updateStatus('Processing for copy...');
+    this.updateStatus('Rendering formulas as images...');
 
-    // Wait a tick for any pending renders (mermaid, katex, etc.)
-    await new Promise(r => setTimeout(r, 100));
-
-    // Clone the container and inline all computed styles
-    const processed = this._prepareCopyContent(container);
-
-    const plainText = container.textContent || '';
-    const success = await this._writeClipboard(processed, plainText);
-
-    if (success) {
-      this._showCopiedFeedback();
-      this.updateStatus('Copied! Paste into 微信公众号 editor.');
-    }
-  }
-
-  /**
-   * Clone visible DOM and inline all computed CSS styles.
-   * WeChat editor ignores stylesheets — only inline styles work.
-   */
-  _prepareCopyContent(source) {
-    // Clone in visible area so computed styles are accurate
-    const clone = source.cloneNode(true);
-    clone.style.position = 'fixed';
-    clone.style.top = '0';
-    clone.style.left = '-9999px';
-    clone.style.width = '800px';  // WeChat editor width
-    clone.style.backgroundColor = '#ffffff';
-    clone.style.color = '#000000';
-    clone.style.zIndex = '-1';
-    clone.style.pointerEvents = 'none';
+    // Clone to off-screen for processing
+    const clone = container.cloneNode(true);
+    clone.style.cssText = 'position:fixed;top:0;left:-9999px;width:800px;background:#fff;color:#000;font-size:16px;line-height:1.6;z-index:-1;pointer-events:none;';
     document.body.appendChild(clone);
 
     try {
-      this._inlineStyles(clone, document);
-      return clone.innerHTML;
+      // Step 1: Convert ALL KaTeX formulas to PNG images
+      await this._convertKatexToImages(clone);
+
+      // Step 2: Apply inline styles to text content
+      this._applyMinimalStyles(clone);
+
+      const processed = clone.innerHTML;
+      const plainText = clone.textContent || '';
+
+      if (!processed.trim()) { alert('No content to copy.'); return; }
+
+      const ok = await this._writeClipboard(processed, plainText);
+      if (ok) { this._showCopiedFeedback(); this.updateStatus('Copied!'); }
+    } catch (e) {
+      console.error('Copy failed:', e);
+      alert('Copy failed: ' + (e.message || 'unknown'));
     } finally {
       clone.remove();
     }
   }
 
-  /**
-   * Walk all elements and compute + apply inline styles.
-   * Copies only the essential CSS properties for WeChat.
-   */
-  _inlineStyles(clone, realDoc) {
-    const INLINE_PROPS = [
-      'color', 'background-color', 'font-family', 'font-size', 'font-weight',
-      'font-style', 'text-align', 'text-decoration', 'line-height',
-      'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
-      'padding', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
-      'border', 'border-top', 'border-bottom', 'border-left', 'border-right',
-      'border-collapse', 'vertical-align', 'white-space', 'word-break',
-      'display', 'width', 'max-width', 'height', 'overflow', 'overflow-x',
-    ];
-
-    const allEls = clone.querySelectorAll('*');
-    for (const el of allEls) {
-      try {
-        // Find corresponding element in real DOM by position/index
-        const idx = Array.from(clone.querySelectorAll('*')).indexOf(el);
-        const realEl = document.querySelectorAll('.markdown-body *')[idx];
-        if (realEl) {
-          const cs = getComputedStyle(realEl);
-          for (const prop of INLINE_PROPS) {
-            const val = cs.getPropertyValue(prop);
-            if (val && val !== 'normal' && val !== 'auto' && val !== 'rgba(0, 0, 0, 0)') {
-              el.style.setProperty(prop, val);
-            }
-          }
-        }
-      } catch (e) { /* skip */ }
-    }
-
-    // Special: KaTeX elements need font-family and sizing
-    const katexEls = clone.querySelectorAll('.katex, .katex *');
+  /** Convert all KaTeX elements to inline PNG images (WeChat compatible). */
+  async _convertKatexToImages(clone) {
+    const katexEls = clone.querySelectorAll('.katex-display, .katex');
     for (const el of katexEls) {
       try {
-        const realKatex = document.querySelector('.katex');
-        if (realKatex) {
-          const cs = getComputedStyle(realKatex);
-          el.style.setProperty('font-family', cs.fontFamily);
-          el.style.setProperty('font-size', cs.fontSize);
+        const rect = el.getBoundingClientRect();
+        const w = Math.max(Math.ceil(rect.width), 20);
+        const h = Math.max(Math.ceil(rect.height), 20);
+        const scale = 2;
+
+        // SVG foreignObject → canvas → PNG
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+          <foreignObject width="100%" height="100%">
+            <div xmlns="http://www.w3.org/1999/xhtml">${el.outerHTML}</div>
+          </foreignObject></svg>`;
+        const blob = new Blob([svg], {type:'image/svg+xml;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+
+        const dataUrl = await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = w * scale; c.height = h * scale;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
+            ctx.scale(scale, scale); ctx.drawImage(img, 0, 0, w, h);
+            URL.revokeObjectURL(url); resolve(c.toDataURL('image/png'));
+          };
+          img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+          img.src = url;
+        });
+
+        if (!dataUrl) continue;
+        const isDisplay = !!el.closest('.katex-display');
+        const wrapper = el.closest('p') || el.parentNode;
+        const imgTag = document.createElement('img');
+        imgTag.src = dataUrl;
+        imgTag.style.cssText = isDisplay
+          ? 'display:block;max-width:100%;height:auto;margin:16px auto;'
+          : 'display:inline;vertical-align:middle;max-width:100%;height:1.2em;';
+
+        // Replace: display formula replaces its paragraph, inline replaces the span
+        if (isDisplay && wrapper && wrapper !== clone && wrapper.tagName === 'P') {
+          wrapper.replaceWith(imgTag);
+        } else {
+          const target = el.closest('.katex-display') || el;
+          target.replaceWith(imgTag);
         }
-      } catch (e) { /* skip */ }
+      } catch (e) { /* keep original */ }
     }
+  }
 
-    // Ensure images have proper sizing
-    const imgs = clone.querySelectorAll('img');
-    for (const img of imgs) {
-      img.style.setProperty('max-width', '100%');
-      img.style.setProperty('height', 'auto');
+  _applyMinimalStyles(clone) {
+    for (const pre of clone.querySelectorAll('pre')) {
+      pre.style.cssText = 'background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:12px;overflow-x:auto;font-family:Consolas,monospace;font-size:13px;line-height:1.5;margin:8px 0;';
     }
-
-    // Ensure code blocks have background
-    const pres = clone.querySelectorAll('pre');
-    for (const pre of pres) {
-      pre.style.setProperty('background-color', '#f6f8fa');
-      pre.style.setProperty('border', '1px solid #e1e4e8');
-      pre.style.setProperty('border-radius', '6px');
-      pre.style.setProperty('padding', '16px');
-      pre.style.setProperty('overflow-x', 'auto');
+    for (const code of clone.querySelectorAll('code')) {
+      if (!code.closest('pre')) code.style.cssText = 'background:#f5f5f5;padding:2px 6px;border-radius:3px;font-family:Consolas,monospace;font-size:13px;';
     }
-    const codes = clone.querySelectorAll('pre code, code');
-    for (const code of codes) {
-      code.style.setProperty('font-family', 'Consolas, monospace');
-      code.style.setProperty('font-size', '14px');
-      if (!code.closest('pre')) {
-        code.style.setProperty('background-color', '#f6f8fa');
-        code.style.setProperty('padding', '2px 6px');
-        code.style.setProperty('border-radius', '3px');
-      }
-    }
-
-    // Blockquotes
-    const bqs = clone.querySelectorAll('blockquote');
-    for (const bq of bqs) {
-      bq.style.setProperty('border-left', '4px solid #dfe2e5');
-      bq.style.setProperty('padding-left', '16px');
-      bq.style.setProperty('color', '#6a737d');
-    }
-
-    // Tables
-    const tables = clone.querySelectorAll('table');
-    for (const t of tables) {
-      t.style.setProperty('border-collapse', 'collapse');
-      t.style.setProperty('width', '100%');
-    }
-    const cells = clone.querySelectorAll('th, td');
-    for (const c of cells) {
-      c.style.setProperty('border', '1px solid #dfe2e5');
-      c.style.setProperty('padding', '8px 12px');
-    }
-    const ths = clone.querySelectorAll('th');
-    for (const th of ths) {
-      th.style.setProperty('background-color', '#f6f8fa');
-      th.style.setProperty('font-weight', 'bold');
-    }
-
-    // Headings
-    for (const h of clone.querySelectorAll('h1, h2, h3, h4, h5, h6')) {
-      h.style.setProperty('font-weight', 'bold');
-      h.style.setProperty('margin', '16px 0 8px 0');
-    }
-
-    return clone;
+    for (const t of clone.querySelectorAll('table')) t.style.cssText = 'border-collapse:collapse;width:100%;margin:8px 0;';
+    for (const c of clone.querySelectorAll('th')) c.style.cssText = 'border:1px solid #999;padding:6px 10px;background:#f0f0f0;font-weight:bold;';
+    for (const c of clone.querySelectorAll('td')) c.style.cssText = 'border:1px solid #999;padding:6px 10px;';
+    for (const bq of clone.querySelectorAll('blockquote')) bq.style.cssText = 'border-left:4px solid #ccc;padding-left:12px;color:#666;margin:8px 0;';
+    for (const h of clone.querySelectorAll('h1,h2,h3,h4,h5,h6')) h.style.cssText = 'font-weight:bold;margin:16px 0 8px;';
   }
 
   async _writeClipboard(html, plainText) {
     try {
       if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
-        const item = new ClipboardItem({
-          'text/html': new Blob([html], { type: 'text/html' }),
-          'text/plain': new Blob([plainText], { type: 'text/plain' })
-        });
-        await navigator.clipboard.write([item]);
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/html': new Blob([html], {type:'text/html'}),
+          'text/plain': new Blob([plainText], {type:'text/plain'})
+        })]);
         return true;
       }
-    } catch (e) {
-      // Fall through to execCommand
-    }
-    return this._copyUsingExecCommand(html);
+    } catch (e) {}
+    return this._copyExec(html);
   }
 
-  _copyUsingExecCommand(html) {
-    const div = document.createElement('div');
-    div.innerHTML = html;
-    div.style.position = 'fixed';
-    div.style.left = '-9999px';
-    div.style.top = '0';
-    div.style.opacity = '0';
-    div.style.pointerEvents = 'none';
-    div.style.backgroundColor = '#ffffff';
-    div.style.color = '#000000';
-    document.body.appendChild(div);
-
-    const sel = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(div);
-    sel.removeAllRanges();
-    sel.addRange(range);
-
-    const success = document.execCommand('copy');
-    sel.removeAllRanges();
-    div.remove();
-
-    if (!success) throw new Error('execCommand copy failed');
+  _copyExec(html) {
+    const d = document.createElement('div');
+    d.innerHTML = html;
+    d.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none;background:#fff;';
+    document.body.appendChild(d);
+    const s = window.getSelection(); const r = document.createRange();
+    r.selectNodeContents(d); s.removeAllRanges(); s.addRange(r);
+    const ok = document.execCommand('copy'); s.removeAllRanges(); d.remove();
+    if (!ok) throw new Error('execCommand failed');
     return true;
   }
 
   _showCopiedFeedback() {
     const btn = document.getElementById('btn-copy');
-    if (btn) {
-      btn.classList.add('copied');
-      const label = btn.querySelector('.btn-label');
-      const origText = label ? label.textContent : 'Copy';
-      if (label) label.textContent = 'Copied!';
-      setTimeout(() => {
-        btn.classList.remove('copied');
-        if (label) label.textContent = origText;
-      }, 2000);
-    }
-    this.updateStatus('Content copied to clipboard — paste in 微信公众号 editor');
+    if (!btn) return;
+    btn.classList.add('copied');
+    const label = btn.querySelector('.btn-label');
+    const orig = label ? label.textContent : 'Copy';
+    if (label) label.textContent = 'Copied!';
+    setTimeout(() => { btn.classList.remove('copied'); if (label) label.textContent = orig; }, 2000);
+    this.updateStatus('Formulas rendered as images. Paste into 微信公众号.');
   }
 
   // ================ Empty state ================
