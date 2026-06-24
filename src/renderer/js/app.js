@@ -314,39 +314,154 @@ class App {
     let container = this.isEditMode ? this.previewContent : this.contentEl;
     if (!container || !container.innerHTML.trim()) { alert('No content to copy.'); return; }
 
-    this.updateStatus('Inlining styles for copy...');
+    this.updateStatus('Processing formulas...');
 
-    // Clone to off-screen
     const clone = container.cloneNode(true);
     clone.style.cssText = 'position:fixed;top:0;left:-9999px;width:780px;background:#fff;color:#333;font-size:16px;line-height:1.75;z-index:-1;pointer-events:none;';
     document.body.appendChild(clone);
 
     try {
-      // Core: inline all CSS from document stylesheets into the clone
+      // Step 1: Convert all KaTeX formulas to images (WeChat-safe)
+      await this._renderAllFormulasAsImages(clone);
+
+      // Step 2: Inline CSS for remaining text elements
       this._inlineCssRules(clone);
 
-      const html = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="background:#fff;color:#333;">'
-        + clone.innerHTML + '</body></html>';
+      const html = clone.innerHTML;
       const plainText = clone.textContent || '';
 
       const ok = await this._writeClipboard(html, plainText);
-      if (ok) { this._showCopiedFeedback(); this.updateStatus('Copied! Paste into 微信公众号.'); }
+      if (ok) { this._showCopiedFeedback(); this.updateStatus('Copied! Paste into WeChat.'); }
     } catch (e) {
       console.error('Copy error:', e);
-      alert('Copy failed: ' + (e.message || 'unknown'));
+      alert('Copy failed.');
     } finally {
       clone.remove();
     }
   }
 
   /**
-   * Inline all matching CSS rules from document stylesheets into cloned DOM.
-   * WeChat strips <style> and <link> — only inline style="" survives.
+   * Convert ALL .katex elements to inline PNG images.
+   * Uses a visible DOM container so fonts are properly loaded,
+   * then SVG foreignObject + Canvas for the actual conversion.
    */
+  async _renderAllFormulasAsImages(clone) {
+    // Find ALL katex elements first (query before DOM mutations)
+    const katexEls = Array.from(clone.querySelectorAll('.katex-display .katex-html, .katex .katex-html'));
+    if (!katexEls.length) return;
+
+    // Create a visible staging area with proper CSS context
+    const stage = document.createElement('div');
+    stage.style.cssText = 'position:fixed;top:10px;left:10px;z-index:999999;background:#fff;padding:8px;';
+    // Copy KaTeX CSS links to the stage
+    for (const link of document.querySelectorAll('link[rel="stylesheet"]')) {
+      if (link.href && (link.href.includes('katex') || link.href.includes('main.css'))) {
+        const l = link.cloneNode();
+        stage.appendChild(l);
+      }
+    }
+    // Also add kaTeX style inline
+    for (const style of document.querySelectorAll('style')) {
+      if (style.textContent.includes('katex') || style.textContent.includes('KaTeX')) {
+        stage.appendChild(style.cloneNode(true));
+      }
+    }
+    document.body.appendChild(stage);
+
+    try {
+      for (const el of katexEls) {
+        try {
+          const dataUrl = await this._captureElementAsImage(el, stage);
+          if (!dataUrl) continue;
+
+          const img = document.createElement('img');
+          img.src = dataUrl;
+          // Determine if display or inline
+          const katexDisplay = el.closest('.katex-display');
+          if (katexDisplay) {
+            img.style.cssText = 'display:block;max-width:100%;height:auto;margin:16px auto;';
+            // Replace the entire display container
+            const wrapper = katexDisplay.closest('p') || katexDisplay.parentElement;
+            if (wrapper && wrapper !== clone) {
+              wrapper.replaceWith(img);
+            } else {
+              katexDisplay.replaceWith(img);
+            }
+          } else {
+            // Inline formula: replace with inline image
+            const katexContainer = el.closest('.katex');
+            img.style.cssText = 'display:inline;vertical-align:middle;max-width:100%;';
+            if (katexContainer) katexContainer.replaceWith(img);
+            else el.replaceWith(img);
+          }
+        } catch (e) {
+          console.warn('Formula render failed:', e.message);
+        }
+      }
+    } finally {
+      stage.remove();
+    }
+  }
+
+  /**
+   * Capture a single DOM element as a PNG data URL.
+   * Uses the staging container (with loaded KaTeX CSS) to ensure fonts render.
+   */
+  _captureElementAsImage(el, stage) {
+    return new Promise((resolve) => {
+      const srcRect = el.getBoundingClientRect();
+      const w = Math.max(Math.ceil(srcRect.width), 40);
+      const h = Math.max(Math.ceil(srcRect.height), 20);
+
+      // Clone the element into the stage (inherits stage's styles)
+      const duplicate = el.cloneNode(true);
+      stage.innerHTML = ''; // Clear previous
+      // Re-add CSS links
+      for (const link of document.querySelectorAll('link[rel="stylesheet"]')) {
+        if (link.href && link.href.includes('katex')) {
+          stage.appendChild(link.cloneNode());
+        }
+      }
+      stage.appendChild(duplicate);
+
+      // Wait for fonts to render
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const dr = duplicate.getBoundingClientRect();
+          const dw = Math.max(Math.ceil(dr.width), 40);
+          const dh = Math.max(Math.ceil(dr.height), 20);
+          const scale = 2;
+
+          // Use XMLSerializer for proper SVG with the element's current DOM state
+          const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${dw}" height="${dh}">
+            <foreignObject width="100%" height="100%">
+              <div xmlns="http://www.w3.org/1999/xhtml">${duplicate.outerHTML}</div>
+            </foreignObject>
+          </svg>`;
+
+          const blob = new Blob([svgStr], {type:'image/svg+xml;charset=utf-8'});
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+          img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = dw * scale; c.height = dh * scale;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, c.width, c.height);
+            ctx.scale(scale, scale);
+            ctx.drawImage(img, 0, 0, dw, dh);
+            URL.revokeObjectURL(url);
+            resolve(c.toDataURL('image/png'));
+          };
+          img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+          img.src = url;
+        });
+      });
+    });
+  }
+
   _inlineCssRules(clone) {
     const allRules = [];
-
-    // Collect all CSS rules from all stylesheets
     for (const sheet of document.styleSheets) {
       try {
         for (const rule of sheet.cssRules || []) {
@@ -354,33 +469,14 @@ class App {
             allRules.push({ selector: rule.selectorText, style: rule.style });
           }
         }
-      } catch (e) { /* cross-origin sheets throw */ }
+      } catch (e) {}
     }
-
-    // Walk every element in the clone
-    const allEls = clone.querySelectorAll('*');
-    // Also handle the clone root itself
-    this._applyRules(clone, allRules);
-
-    for (const el of allEls) {
-      this._applyRules(el, allRules);
-    }
-  }
-
-  /**
-   * Match collected CSS rules against a single element.
-   */
-  _applyRules(el, rules) {
-    let merged = '';
-    for (const { selector, style } of rules) {
-      try {
-        if (el.matches && el.matches(selector)) {
-          merged += style.cssText;
-        }
-      } catch (e) { /* invalid selector */ }
-    }
-    if (merged) {
-      el.setAttribute('style', merged + (el.getAttribute('style') || ''));
+    for (const el of clone.querySelectorAll('*')) {
+      let merged = '';
+      for (const { selector, style } of allRules) {
+        try { if (el.matches && el.matches(selector)) merged += style.cssText; } catch(e) {}
+      }
+      if (merged) el.setAttribute('style', merged + (el.getAttribute('style') || ''));
     }
   }
 
