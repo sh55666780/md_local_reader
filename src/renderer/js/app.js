@@ -314,99 +314,74 @@ class App {
     let container = this.isEditMode ? this.previewContent : this.contentEl;
     if (!container || !container.innerHTML.trim()) { alert('No content to copy.'); return; }
 
-    this.updateStatus('Rendering formulas as images...');
+    this.updateStatus('Inlining styles for copy...');
 
-    // Clone to off-screen for processing
+    // Clone to off-screen
     const clone = container.cloneNode(true);
-    clone.style.cssText = 'position:fixed;top:0;left:-9999px;width:800px;background:#fff;color:#000;font-size:16px;line-height:1.6;z-index:-1;pointer-events:none;';
+    clone.style.cssText = 'position:fixed;top:0;left:-9999px;width:780px;background:#fff;color:#333;font-size:16px;line-height:1.75;z-index:-1;pointer-events:none;';
     document.body.appendChild(clone);
 
     try {
-      // Step 1: Convert ALL KaTeX formulas to PNG images
-      await this._convertKatexToImages(clone);
+      // Core: inline all CSS from document stylesheets into the clone
+      this._inlineCssRules(clone);
 
-      // Step 2: Apply inline styles to text content
-      this._applyMinimalStyles(clone);
-
-      const processed = clone.innerHTML;
+      const html = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="background:#fff;color:#333;">'
+        + clone.innerHTML + '</body></html>';
       const plainText = clone.textContent || '';
 
-      if (!processed.trim()) { alert('No content to copy.'); return; }
-
-      const ok = await this._writeClipboard(processed, plainText);
-      if (ok) { this._showCopiedFeedback(); this.updateStatus('Copied!'); }
+      const ok = await this._writeClipboard(html, plainText);
+      if (ok) { this._showCopiedFeedback(); this.updateStatus('Copied! Paste into 微信公众号.'); }
     } catch (e) {
-      console.error('Copy failed:', e);
+      console.error('Copy error:', e);
       alert('Copy failed: ' + (e.message || 'unknown'));
     } finally {
       clone.remove();
     }
   }
 
-  /** Convert all KaTeX elements to inline PNG images (WeChat compatible). */
-  async _convertKatexToImages(clone) {
-    const katexEls = clone.querySelectorAll('.katex-display, .katex');
-    for (const el of katexEls) {
+  /**
+   * Inline all matching CSS rules from document stylesheets into cloned DOM.
+   * WeChat strips <style> and <link> — only inline style="" survives.
+   */
+  _inlineCssRules(clone) {
+    const allRules = [];
+
+    // Collect all CSS rules from all stylesheets
+    for (const sheet of document.styleSheets) {
       try {
-        const rect = el.getBoundingClientRect();
-        const w = Math.max(Math.ceil(rect.width), 20);
-        const h = Math.max(Math.ceil(rect.height), 20);
-        const scale = 2;
-
-        // SVG foreignObject → canvas → PNG
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-          <foreignObject width="100%" height="100%">
-            <div xmlns="http://www.w3.org/1999/xhtml">${el.outerHTML}</div>
-          </foreignObject></svg>`;
-        const blob = new Blob([svg], {type:'image/svg+xml;charset=utf-8'});
-        const url = URL.createObjectURL(blob);
-
-        const dataUrl = await new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            const c = document.createElement('canvas');
-            c.width = w * scale; c.height = h * scale;
-            const ctx = c.getContext('2d');
-            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
-            ctx.scale(scale, scale); ctx.drawImage(img, 0, 0, w, h);
-            URL.revokeObjectURL(url); resolve(c.toDataURL('image/png'));
-          };
-          img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
-          img.src = url;
-        });
-
-        if (!dataUrl) continue;
-        const isDisplay = !!el.closest('.katex-display');
-        const wrapper = el.closest('p') || el.parentNode;
-        const imgTag = document.createElement('img');
-        imgTag.src = dataUrl;
-        imgTag.style.cssText = isDisplay
-          ? 'display:block;max-width:100%;height:auto;margin:16px auto;'
-          : 'display:inline;vertical-align:middle;max-width:100%;height:1.2em;';
-
-        // Replace: display formula replaces its paragraph, inline replaces the span
-        if (isDisplay && wrapper && wrapper !== clone && wrapper.tagName === 'P') {
-          wrapper.replaceWith(imgTag);
-        } else {
-          const target = el.closest('.katex-display') || el;
-          target.replaceWith(imgTag);
+        for (const rule of sheet.cssRules || []) {
+          if (rule.type === CSSRule.STYLE_RULE) {
+            allRules.push({ selector: rule.selectorText, style: rule.style });
+          }
         }
-      } catch (e) { /* keep original */ }
+      } catch (e) { /* cross-origin sheets throw */ }
+    }
+
+    // Walk every element in the clone
+    const allEls = clone.querySelectorAll('*');
+    // Also handle the clone root itself
+    this._applyRules(clone, allRules);
+
+    for (const el of allEls) {
+      this._applyRules(el, allRules);
     }
   }
 
-  _applyMinimalStyles(clone) {
-    for (const pre of clone.querySelectorAll('pre')) {
-      pre.style.cssText = 'background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:12px;overflow-x:auto;font-family:Consolas,monospace;font-size:13px;line-height:1.5;margin:8px 0;';
+  /**
+   * Match collected CSS rules against a single element.
+   */
+  _applyRules(el, rules) {
+    let merged = '';
+    for (const { selector, style } of rules) {
+      try {
+        if (el.matches && el.matches(selector)) {
+          merged += style.cssText;
+        }
+      } catch (e) { /* invalid selector */ }
     }
-    for (const code of clone.querySelectorAll('code')) {
-      if (!code.closest('pre')) code.style.cssText = 'background:#f5f5f5;padding:2px 6px;border-radius:3px;font-family:Consolas,monospace;font-size:13px;';
+    if (merged) {
+      el.setAttribute('style', merged + (el.getAttribute('style') || ''));
     }
-    for (const t of clone.querySelectorAll('table')) t.style.cssText = 'border-collapse:collapse;width:100%;margin:8px 0;';
-    for (const c of clone.querySelectorAll('th')) c.style.cssText = 'border:1px solid #999;padding:6px 10px;background:#f0f0f0;font-weight:bold;';
-    for (const c of clone.querySelectorAll('td')) c.style.cssText = 'border:1px solid #999;padding:6px 10px;';
-    for (const bq of clone.querySelectorAll('blockquote')) bq.style.cssText = 'border-left:4px solid #ccc;padding-left:12px;color:#666;margin:8px 0;';
-    for (const h of clone.querySelectorAll('h1,h2,h3,h4,h5,h6')) h.style.cssText = 'font-weight:bold;margin:16px 0 8px;';
   }
 
   async _writeClipboard(html, plainText) {
@@ -425,9 +400,9 @@ class App {
   _copyExec(html) {
     const d = document.createElement('div');
     d.innerHTML = html;
-    d.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none;background:#fff;';
+    d.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none;';
     document.body.appendChild(d);
-    const s = window.getSelection(); const r = document.createRange();
+    const s = window.getSelection(), r = document.createRange();
     r.selectNodeContents(d); s.removeAllRanges(); s.addRange(r);
     const ok = document.execCommand('copy'); s.removeAllRanges(); d.remove();
     if (!ok) throw new Error('execCommand failed');
@@ -442,7 +417,6 @@ class App {
     const orig = label ? label.textContent : 'Copy';
     if (label) label.textContent = 'Copied!';
     setTimeout(() => { btn.classList.remove('copied'); if (label) label.textContent = orig; }, 2000);
-    this.updateStatus('Formulas rendered as images. Paste into 微信公众号.');
   }
 
   // ================ Empty state ================
